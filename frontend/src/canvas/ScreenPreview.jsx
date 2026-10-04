@@ -2,7 +2,14 @@ import React, { useRef, useEffect, useState, memo } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { hostProtocol } from '../ipc/hostProtocol.js';
 import { IPC_MESSAGES } from '../ipc/messageTypes.js';
-import { setActiveScreenId } from '../store/slices/selectionSlice.js';
+import {
+  setActiveScreenId,
+  setHoverElement,
+  clearHoverElement,
+  selectElement,
+  clearSelection,
+} from '../store/slices/selectionSlice.js';
+import HoverOverlay from './HoverOverlay.jsx';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 
 function ScreenPreview({ screen, index }) {
@@ -49,15 +56,34 @@ function ScreenPreview({ screen, index }) {
         setConnectionTimeout(false);
         // Send current mode to probe
         hostProtocol.postToScreen(screen.id, IPC_MESSAGES.SET_MODE, { mode });
+      } else if (type === IPC_MESSAGES.ELEMENT_HOVER) {
+        if (payload?.element) {
+          dispatch(setHoverElement({ screenId: screen.id, ...payload.element }));
+        }
+      } else if (type === IPC_MESSAGES.ELEMENT_UNHOVER) {
+        dispatch(clearHoverElement());
+      } else if (type === IPC_MESSAGES.ELEMENT_SELECT) {
+        if (payload?.element) {
+          dispatch(
+            selectElement({
+              screenId: screen.id,
+              element: payload.element,
+              multiSelect: Boolean(payload.shiftKey),
+            })
+          );
+        }
+      } else if (type === IPC_MESSAGES.CLEAR_SELECTION) {
+        dispatch(clearSelection());
       } else if (type === IPC_MESSAGES.PAGE_ERROR) {
         setPageError(payload?.message || 'Page script error');
       } else if (type === IPC_MESSAGES.PAGE_NAVIGATED) {
         setPageError(null);
+        dispatch(clearSelection());
       }
     });
 
     return () => unsubscribe();
-  }, [screen.id, mode]);
+  }, [screen.id, mode, dispatch]);
 
   const handleFrameClick = () => {
     dispatch(setActiveScreenId(screen.id));
@@ -166,6 +192,9 @@ function ScreenPreview({ screen, index }) {
             pointerEvents: 'auto',
           }}
         />
+
+        {/* 1px Hover Overlay & Label (R2) */}
+        <HoverOverlay screenId={screen.id} />
 
         {/* Connection Failure Overlay (R6.2) */}
         {connectionTimeout && !isConnected && (

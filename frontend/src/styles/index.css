@@ -46,23 +46,34 @@
   background-size: 100% 100%, 24px 24px;
 }
 
-/* Frosted Obsidian Glass Panels */
+/* Frosted Obsidian Glass Panels (Glassmorphism) */
+.glass-panel {
+  background: rgba(12, 14, 17, 0.78);
+  backdrop-filter: blur(28px) saturate(190%);
+  -webkit-backdrop-filter: blur(28px) saturate(190%);
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.06), 0 16px 40px -8px rgba(0, 0, 0, 0.4);
+}
+
 .surface-panel {
-  background: rgba(13, 15, 17, 0.88);
+  background: rgba(13, 15, 17, 0.85);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
   border-color: rgba(255, 255, 255, 0.07);
 }
 
 .surface-topbar {
-  background: rgba(8, 9, 10, 0.92);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  background: rgba(8, 9, 10, 0.82);
+  backdrop-filter: blur(28px) saturate(190%);
+  -webkit-backdrop-filter: blur(28px) saturate(190%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 -1px 0 0 rgba(255, 255, 255, 0.04);
 }
 
 .surface-card {
-  background: #0f1114;
+  background: rgba(15, 17, 20, 0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   border: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow: 0 8px 32px -4px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }

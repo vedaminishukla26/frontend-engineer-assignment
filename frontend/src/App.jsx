@@ -45,25 +45,25 @@ export default function App() {
 
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-[#08090a] text-[#ededed] font-sans select-none antialiased">
-      {/* Top Application Navbar (Memoized) */}
+      {/* Top Application Navbar */}
       <TopNavbar />
 
-      {/* Main Workspace 3-Column Layout */}
+      {/* Main Workspace Layout (Docked Precision Sidebars) */}
       <div className="flex-1 flex overflow-hidden relative">
-        {/* Left: Layers Panel Sidebar (Memoized) */}
+        {/* Left: Docked Layers Panel */}
         <LayersPanel />
 
         {/* Center: Infinite Canvas Viewport */}
         <main className="flex-1 relative overflow-hidden bg-fanout-grid flex items-center justify-center">
           {screensStatus === 'loading' && (
-            <div className="flex items-center gap-2.5 text-xs text-zinc-300 bg-[#16191c]/90 border border-white/[0.1] px-4 py-2.5 rounded-xl shadow-2xl backdrop-blur-md">
+            <div className="flex items-center gap-2.5 text-xs text-zinc-300 bg-[#16191c]/90 border border-white/[0.1] px-4 py-2.5 rounded-xl shadow-2xl backdrop-blur-md z-10">
               <RefreshCw className="w-4 h-4 animate-spin text-indigo-400" />
               <span>Connecting to mock backend (:4000)...</span>
             </div>
           )}
 
           {screensStatus === 'failed' && (
-            <div className="flex flex-col items-center gap-2.5 text-xs text-rose-300 bg-rose-950/20 border border-rose-500/30 p-5 rounded-2xl shadow-2xl backdrop-blur-md max-w-md text-center">
+            <div className="flex flex-col items-center gap-2.5 text-xs text-rose-300 bg-rose-950/20 border border-rose-500/30 p-5 rounded-2xl shadow-2xl backdrop-blur-md max-w-md text-center z-10">
               <AlertCircle className="w-5 h-5 text-rose-400" />
               <div className="font-semibold text-rose-200">Failed to connect to API</div>
               <p className="text-rose-400/80 text-[11px]">{screensError}</p>
@@ -83,7 +83,7 @@ export default function App() {
           <CanvasHUD />
         </main>
 
-        {/* Right: Inspector Sidebar (Memoized) */}
+        {/* Right: Docked Inspector Panel */}
         <InspectorPanel />
       </div>
     </div>

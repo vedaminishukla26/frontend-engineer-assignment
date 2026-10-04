@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { setPan, setZoom } from '../store/slices/boardSlice.js';
-import { clearSelection } from '../store/slices/selectionSlice.js';
+import { clearSelection, clearHoverElement } from '../store/slices/selectionSlice.js';
 import { hostProtocol } from '../ipc/hostProtocol.js';
 import { IPC_MESSAGES } from '../ipc/messageTypes.js';
 import ScreenPreview from './ScreenPreview.jsx';
@@ -17,6 +17,9 @@ export default function BoardCanvas() {
   // Centralized Zoom Helper: zoom centered on a specific viewport point (cx, cy)
   const applyPointerZoom = useCallback(
     (cx, cy, deltaY) => {
+      // Clear hover during zoom (R2.3)
+      dispatch(clearHoverElement());
+
       const zoomFactor = Math.pow(1.002, -deltaY);
       const newZoom = Math.min(4.0, Math.max(0.25, zoom * zoomFactor));
       if (newZoom === zoom) return;
@@ -105,11 +108,13 @@ export default function BoardCanvas() {
     if (!isCanvasBg) return;
 
     if (e.button === 0) {
-      // Clicking empty board space clears selection (R3.3)
+      // Clicking empty board space clears selection (R3.3) and hover (R2.3)
       dispatch(clearSelection());
+      dispatch(clearHoverElement());
     }
 
     setIsDragging(true);
+    dispatch(clearHoverElement());
     dragStartRef.current = {
       x: e.clientX,
       y: e.clientY,
