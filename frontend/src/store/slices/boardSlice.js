@@ -28,11 +28,25 @@ const boardSlice = createSlice({
     mode: 'select', // 'select' | 'interact'
     pan: { x: 80, y: 80 },
     zoom: 1.0, // 0.25 to 4.0
+    showLayers: true,
+    showInspector: true,
     screens: [],
     screensStatus: 'idle', // 'idle' | 'loading' | 'succeeded' | 'failed'
     screensError: null,
   },
   reducers: {
+    toggleLayers: (state) => {
+      state.showLayers = !state.showLayers;
+    },
+    toggleInspector: (state) => {
+      state.showInspector = !state.showInspector;
+    },
+    setShowLayers: (state, action) => {
+      state.showLayers = Boolean(action.payload);
+    },
+    setShowInspector: (state, action) => {
+      state.showInspector = Boolean(action.payload);
+    },
     setMode: (state, action) => {
       state.mode = action.payload;
     },
@@ -67,6 +81,10 @@ const boardSlice = createSlice({
       state.pan = { x: 80, y: 80 };
       state.zoom = 1.0;
     },
+    fitToScreen: (state) => {
+      state.pan = { x: 40, y: 40 };
+      state.zoom = 0.35;
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -86,6 +104,10 @@ const boardSlice = createSlice({
 });
 
 export const {
+  toggleLayers,
+  toggleInspector,
+  setShowLayers,
+  setShowInspector,
   setMode,
   toggleMode,
   setPan,
@@ -93,6 +115,7 @@ export const {
   setZoom,
   zoomAtPoint,
   resetView,
+  fitToScreen,
 } = boardSlice.actions;
 
 export default boardSlice.reducer;

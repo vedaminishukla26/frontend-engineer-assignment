@@ -104,6 +104,19 @@ import {
   window.addEventListener('submit', handleGenericSuppression, true);
   window.addEventListener('dblclick', handleGenericSuppression, true);
 
+  // Wheel handling: Ctrl/Cmd + wheel zooms board (R1.3), normal wheel scrolls preview (R1.4)
+  function handleWheel(e) {
+    if (e.ctrlKey || e.metaKey) {
+      e.preventDefault();
+      postToHost(IPC.WHEEL_ZOOM, {
+        deltaY: e.deltaY,
+        clientX: e.clientX,
+        clientY: e.clientY,
+      });
+    }
+  }
+  window.addEventListener('wheel', handleWheel, { passive: false, capture: true });
+
   // Geometry tracking (Scroll & Resize)
   function notifyGeometry() {
     postToHost(IPC.GEOMETRY_CHANGED, {

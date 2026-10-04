@@ -97,4 +97,6 @@ export const {
   markElementDeleted,
 } = selectionSlice.actions;
 
+export const setActiveScreen = setActiveScreenId;
+
 export default selectionSlice.reducer;
