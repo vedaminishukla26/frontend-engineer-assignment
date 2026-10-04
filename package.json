@@ -1,9 +1,31 @@
 {
   "name": "figr-frontend-assignment",
   "private": true,
-  "description": "Starter kit for the Figr frontend engineer assignment",
-  "engines": { "node": ">=18" },
+  "description": "Figma-style web page canvas viewer and inspector",
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
-    "backend": "node backend/server.js"
+    "backend": "node backend/server.js",
+    "frontend": "vite frontend --port 5173",
+    "dev": "concurrently -k -n \"backend,frontend\" -c \"cyan,magenta\" \"npm run backend\" \"npm run frontend\"",
+    "start": "npm run dev",
+    "build": "vite build frontend"
+  },
+  "dependencies": {
+    "@reduxjs/toolkit": "^2.13.0",
+    "clsx": "^2.1.1",
+    "concurrently": "^10.0.5",
+    "lucide-react": "^1.52.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "react-redux": "^9.3.0",
+    "tailwind-merge": "^3.7.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.3",
+    "@vitejs/plugin-react": "^6.1.1",
+    "tailwindcss": "^4.3.3",
+    "vite": "^8.3.2"
   }
 }

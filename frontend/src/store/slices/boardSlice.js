@@ -1,0 +1,98 @@
+import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
+
+const API_BASE = 'http://localhost:4000';
+
+export const fetchScreens = createAsyncThunk(
+  'board/fetchScreens',
+  async (params = {}, { rejectWithValue }) => {
+    try {
+      const url = new URL(`${API_BASE}/screens`);
+      if (params.latency) url.searchParams.set('latency', params.latency);
+      if (params.fail) url.searchParams.set('fail', params.fail);
+
+      const res = await fetch(url.toString());
+      if (!res.ok) {
+        throw new Error(`Failed to fetch screens: HTTP ${res.status}`);
+      }
+      const data = await res.json();
+      return data;
+    } catch (err) {
+      return rejectWithValue(err.message || 'Failed to fetch screens');
+    }
+  }
+);
+
+const boardSlice = createSlice({
+  name: 'board',
+  initialState: {
+    mode: 'select', // 'select' | 'interact'
+    pan: { x: 80, y: 80 },
+    zoom: 1.0, // 0.25 to 4.0
+    screens: [],
+    screensStatus: 'idle', // 'idle' | 'loading' | 'succeeded' | 'failed'
+    screensError: null,
+  },
+  reducers: {
+    setMode: (state, action) => {
+      state.mode = action.payload;
+    },
+    toggleMode: (state) => {
+      state.mode = state.mode === 'select' ? 'interact' : 'select';
+    },
+    setPan: (state, action) => {
+      state.pan = action.payload;
+    },
+    updatePan: (state, action) => {
+      state.pan.x += action.payload.dx;
+      state.pan.y += action.payload.dy;
+    },
+    setZoom: (state, action) => {
+      state.zoom = Math.min(4.0, Math.max(0.25, action.payload));
+    },
+    zoomAtPoint: (state, action) => {
+      const { clientX, clientY, factor, canvasRect } = action.payload;
+      const oldZoom = state.zoom;
+      const newZoom = Math.min(4.0, Math.max(0.25, oldZoom * factor));
+      if (newZoom === oldZoom) return;
+
+      const originX = clientX - (canvasRect ? canvasRect.left : 0);
+      const originY = clientY - (canvasRect ? canvasRect.top : 0);
+
+      // Adjust pan so point under cursor stays invariant
+      state.pan.x = originX - ((originX - state.pan.x) * newZoom) / oldZoom;
+      state.pan.y = originY - ((originY - state.pan.y) * newZoom) / oldZoom;
+      state.zoom = newZoom;
+    },
+    resetView: (state) => {
+      state.pan = { x: 80, y: 80 };
+      state.zoom = 1.0;
+    },
+  },
+  extraReducers: (builder) => {
+    builder
+      .addCase(fetchScreens.pending, (state) => {
+        state.screensStatus = 'loading';
+        state.screensError = null;
+      })
+      .addCase(fetchScreens.fulfilled, (state, action) => {
+        state.screensStatus = 'succeeded';
+        state.screens = action.payload;
+      })
+      .addCase(fetchScreens.rejected, (state, action) => {
+        state.screensStatus = 'failed';
+        state.screensError = action.payload || 'Failed to load screens';
+      });
+  },
+});
+
+export const {
+  setMode,
+  toggleMode,
+  setPan,
+  updatePan,
+  setZoom,
+  zoomAtPoint,
+  resetView,
+} = boardSlice.actions;
+
+export default boardSlice.reducer;
