@@ -117,11 +117,16 @@ import {
   }
   window.addEventListener('wheel', handleWheel, { passive: false, capture: true });
 
-  // Geometry tracking (Scroll & Resize)
+  // Geometry tracking (Scroll & Resize with rAF throttling)
+  let geomRaf = null;
   function notifyGeometry() {
-    postToHost(IPC.GEOMETRY_CHANGED, {
-      scrollX: window.scrollX,
-      scrollY: window.scrollY,
+    if (geomRaf) return;
+    geomRaf = requestAnimationFrame(() => {
+      geomRaf = null;
+      postToHost(IPC.GEOMETRY_CHANGED, {
+        scrollX: window.scrollX,
+        scrollY: window.scrollY,
+      });
     });
   }
   window.addEventListener('scroll', notifyGeometry, { passive: true, capture: true });
@@ -268,10 +273,50 @@ import {
         break;
       }
 
+      case IPC.RECONCILE_REQ: {
+        const { requestId, descriptors } = data.payload || {};
+        const updated = [];
+        const vanishedIds = [];
+
+        (descriptors || []).forEach((desc) => {
+          const el = findElementByDescriptor(desc);
+          if (el) {
+            const s = serializeElement(el);
+            if (s) updated.push(s);
+            else vanishedIds.push(desc.id);
+          } else {
+            vanishedIds.push(desc.id);
+          }
+        });
+
+        postToHost(IPC.RECONCILE_RESP, { requestId, updated, vanishedIds });
+        break;
+      }
+
       default:
         break;
     }
   });
+
+  // Intercept keyboard shortcuts even when iframe has focus (R3.6)
+  function handleProbeKeyDown(e) {
+    const targetTag = e.target?.tagName?.toUpperCase();
+    const isEditingInput = (targetTag === 'INPUT' || targetTag === 'TEXTAREA') && e.key !== 'Escape';
+    if (isEditingInput) return;
+
+    const navKeys = ['Enter', 'Tab', 'Escape', 'v', 'V', 'i', 'I'];
+    if (navKeys.includes(e.key)) {
+      e.preventDefault();
+      e.stopPropagation();
+      postToHost(IPC.KEYBOARD_SHORTCUT, {
+        key: e.key,
+        shiftKey: Boolean(e.shiftKey),
+        ctrlKey: Boolean(e.ctrlKey),
+        metaKey: Boolean(e.metaKey),
+      });
+    }
+  }
+  window.addEventListener('keydown', handleProbeKeyDown, true);
 
   // --- Runtime Page Errors (R6.3) ---
   window.addEventListener('error', (event) => {

@@ -3,6 +3,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import { setMode, fetchScreens } from './store/slices/boardSlice.js';
 import { hostProtocol } from './ipc/hostProtocol.js';
 import { IPC_MESSAGES } from './ipc/messageTypes.js';
+import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts.js';
 import BoardCanvas from './canvas/BoardCanvas.jsx';
 import TopNavbar from './components/layout/TopNavbar.jsx';
 import LayersPanel from './components/layers/LayersPanel.jsx';
@@ -28,20 +29,8 @@ export default function App() {
     dispatch(fetchScreens());
   }, [dispatch]);
 
-  // Global Keyboard shortcuts: V for Select, I for Interact
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      if (['INPUT', 'TEXTAREA'].includes(e.target.tagName)) return;
-      if (e.key === 'v' || e.key === 'V') {
-        dispatch(setMode('select'));
-      } else if (e.key === 'i' || e.key === 'I') {
-        dispatch(setMode('interact'));
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [dispatch]);
+  // Initialize Global & Guest Keyboard Shortcuts (V, I, Escape, Enter, Tab, Shift+Enter, Shift+Tab)
+  useKeyboardShortcuts();
 
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-[#08090a] text-[#ededed] font-sans select-none antialiased">

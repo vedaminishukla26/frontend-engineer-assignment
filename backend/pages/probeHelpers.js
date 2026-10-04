@@ -60,15 +60,28 @@ export function findElementByDescriptor(desc) {
     if (el) return el;
   }
   if (desc.id) {
-    if (desc.id.startsWith('[data-key=')) {
+    if (desc.id.startsWith('key:')) {
+      const keyVal = desc.id.slice(4);
+      const el = document.querySelector(`[data-key="${keyVal}"]`);
+      if (el) return el;
+    } else if (desc.id.startsWith('[data-key=')) {
       const el = document.querySelector(desc.id);
       if (el) return el;
+    } else {
+      try {
+        const el = document.querySelector(desc.id);
+        if (el) return el;
+      } catch (e) {
+        // Fallback for complex selectors
+      }
     }
+  }
+  if (desc.path) {
     try {
-      const el = document.querySelector(desc.id);
+      const el = document.querySelector(desc.path);
       if (el) return el;
     } catch (e) {
-      // Invalid selector fallback
+      // Ignore selector errors
     }
   }
   return null;

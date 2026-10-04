@@ -7,9 +7,12 @@ import {
   setHoverElement,
   clearHoverElement,
   selectElement,
+  setSingleSelection,
   clearSelection,
+  updateSelectedRects,
 } from '../store/slices/selectionSlice.js';
 import HoverOverlay from './HoverOverlay.jsx';
+import SelectionOverlay from './SelectionOverlay.jsx';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 
 function ScreenPreview({ screen, index }) {
@@ -19,7 +22,17 @@ function ScreenPreview({ screen, index }) {
 
   // Granular selector: only re-render if THIS screen becomes active/inactive
   const isActive = useSelector((state) => state.selection.activeScreenId === screen.id);
+  const selectedElements = useSelector((state) => state.selection.selectedElements);
   const mode = useSelector((state) => state.board.mode);
+
+  const selectedElementsRef = useRef(selectedElements);
+  const isActiveRef = useRef(isActive);
+  useEffect(() => {
+    selectedElementsRef.current = selectedElements;
+  }, [selectedElements]);
+  useEffect(() => {
+    isActiveRef.current = isActive;
+  }, [isActive]);
 
   const [isConnected, setIsConnected] = useState(false);
   const [pageError, setPageError] = useState(null);
@@ -74,6 +87,34 @@ function ScreenPreview({ screen, index }) {
         }
       } else if (type === IPC_MESSAGES.CLEAR_SELECTION) {
         dispatch(clearSelection());
+      } else if (type === IPC_MESSAGES.DOM_MUTATED || type === IPC_MESSAGES.GEOMETRY_CHANGED) {
+        if (isActiveRef.current && selectedElementsRef.current.length > 0) {
+          hostProtocol.postToScreen(screen.id, IPC_MESSAGES.RECONCILE_REQ, {
+            requestId: Date.now(),
+            descriptors: selectedElementsRef.current.map((el) => ({
+              id: el.id,
+              key: el.key,
+              path: el.path,
+            })),
+          });
+        }
+      } else if (type === IPC_MESSAGES.RECONCILE_RESP) {
+        dispatch(
+          updateSelectedRects({
+            screenId: screen.id,
+            updatedSelections: payload?.updated || [],
+            vanishedIds: payload?.vanishedIds || [],
+          })
+        );
+      } else if (type === IPC_MESSAGES.KEYBOARD_NAV_RESP) {
+        if (payload?.element) {
+          dispatch(
+            setSingleSelection({
+              screenId: screen.id,
+              element: payload.element,
+            })
+          );
+        }
       } else if (type === IPC_MESSAGES.PAGE_ERROR) {
         setPageError(payload?.message || 'Page script error');
       } else if (type === IPC_MESSAGES.PAGE_NAVIGATED) {
@@ -195,6 +236,9 @@ function ScreenPreview({ screen, index }) {
 
         {/* 1px Hover Overlay & Label (R2) */}
         <HoverOverlay screenId={screen.id} />
+
+        {/* 2px Indigo Selection Overlay & Label (R3) */}
+        <SelectionOverlay screenId={screen.id} />
 
         {/* Connection Failure Overlay (R6.2) */}
         {connectionTimeout && !isConnected && (
