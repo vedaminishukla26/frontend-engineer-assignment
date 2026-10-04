@@ -2,6 +2,15 @@ import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 
 const API_BASE = 'http://localhost:4000';
 
+export function getDefaultScreenPosition(index) {
+  const col = index % 4;
+  const row = Math.floor(index / 4);
+  return {
+    x: 80 + col * (1280 + 100),
+    y: 80 + row * (844 + 120),
+  };
+}
+
 export const fetchScreens = createAsyncThunk(
   'board/fetchScreens',
   async (params = {}, { rejectWithValue }) => {
@@ -31,6 +40,7 @@ const boardSlice = createSlice({
     showLayers: true,
     showInspector: true,
     screens: [],
+    screenPositions: {}, // { [screenId]: { x, y } }
     screensStatus: 'idle', // 'idle' | 'loading' | 'succeeded' | 'failed'
     screensError: null,
   },
@@ -85,6 +95,17 @@ const boardSlice = createSlice({
       state.pan = { x: 40, y: 40 };
       state.zoom = 0.35;
     },
+    setScreenPosition: (state, action) => {
+      const { screenId, x, y } = action.payload;
+      state.screenPositions[screenId] = { x, y };
+    },
+    resetScreenPositions: (state) => {
+      const newPos = {};
+      state.screens.forEach((s, idx) => {
+        newPos[s.id] = getDefaultScreenPosition(idx);
+      });
+      state.screenPositions = newPos;
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -95,6 +116,11 @@ const boardSlice = createSlice({
       .addCase(fetchScreens.fulfilled, (state, action) => {
         state.screensStatus = 'succeeded';
         state.screens = action.payload;
+        const initialPos = {};
+        action.payload.forEach((screen, idx) => {
+          initialPos[screen.id] = getDefaultScreenPosition(idx);
+        });
+        state.screenPositions = initialPos;
       })
       .addCase(fetchScreens.rejected, (state, action) => {
         state.screensStatus = 'failed';
@@ -116,6 +142,9 @@ export const {
   zoomAtPoint,
   resetView,
   fitToScreen,
+  setScreenPosition,
+  resetScreenPositions,
 } = boardSlice.actions;
 
 export default boardSlice.reducer;
+

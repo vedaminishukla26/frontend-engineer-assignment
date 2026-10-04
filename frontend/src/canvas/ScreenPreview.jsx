@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState, memo } from 'react';
+import React, { useRef, useEffect, useState, memo, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { hostProtocol } from '../ipc/hostProtocol.js';
 import { IPC_MESSAGES } from '../ipc/messageTypes.js';
@@ -11,14 +11,15 @@ import {
   clearSelection,
   updateSelectedRects,
 } from '../store/slices/selectionSlice.js';
+import { setScreenPosition } from '../store/slices/boardSlice.js';
 import HoverOverlay from './HoverOverlay.jsx';
 import SelectionOverlay from './SelectionOverlay.jsx';
-import { AlertTriangle, RefreshCw } from 'lucide-react';
+import { AlertTriangle, RefreshCw, GripVertical } from 'lucide-react';
 
 import RegionErrorBoundary from '../components/common/RegionErrorBoundary.jsx';
 import { recordRegionalError, clearRegionalError, addPageRuntimeError } from '../store/slices/errorSlice.js';
 
-function ScreenPreviewContent({ screen, index }) {
+function ScreenPreviewContent({ screen, index, position }) {
   const dispatch = useDispatch();
   const iframeRef = useRef(null);
   const containerRef = useRef(null);
@@ -27,6 +28,7 @@ function ScreenPreviewContent({ screen, index }) {
   const isActive = useSelector((state) => state.selection.activeScreenId === screen.id);
   const selectedElements = useSelector((state) => state.selection.selectedElements);
   const mode = useSelector((state) => state.board.mode);
+  const zoom = useSelector((state) => state.board.zoom);
 
   const previewError = useSelector((state) => state.error.regionErrors.preview[screen.id]);
   const pageErrors = useSelector((state) => state.error.pageErrorsByScreen[screen.id]);
@@ -43,6 +45,56 @@ function ScreenPreviewContent({ screen, index }) {
 
   const [isConnected, setIsConnected] = useState(false);
   const [connectionTimeout, setConnectionTimeout] = useState(false);
+  const [isDraggingView, setIsDraggingView] = useState(false);
+
+  const dragStartRef = useRef({ startX: 0, startY: 0, posX: 0, posY: 0 });
+
+  // Handle Dragging Screen Preview View on Canvas
+  const handleHeaderMouseDown = (e) => {
+    // Don't start drag if clicking interactive buttons
+    if (e.target.closest('button')) return;
+
+    e.stopPropagation();
+    e.preventDefault();
+
+    dispatch(setActiveScreenId(screen.id));
+    dispatch(clearHoverElement());
+
+    setIsDraggingView(true);
+    dragStartRef.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      posX: position ? position.x : 0,
+      posY: position ? position.y : 0,
+    };
+  };
+
+  useEffect(() => {
+    if (!isDraggingView) return;
+
+    const handleMouseMove = (e) => {
+      const dx = (e.clientX - dragStartRef.current.startX) / zoom;
+      const dy = (e.clientY - dragStartRef.current.startY) / zoom;
+      dispatch(
+        setScreenPosition({
+          screenId: screen.id,
+          x: Math.round(dragStartRef.current.posX + dx),
+          y: Math.round(dragStartRef.current.posY + dy),
+        })
+      );
+    };
+
+    const handleMouseUp = () => {
+      setIsDraggingView(false);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDraggingView, screen.id, zoom, dispatch]);
 
   // Register iframe with Host Protocol on mount
   useEffect(() => {
@@ -165,33 +217,46 @@ function ScreenPreviewContent({ screen, index }) {
   };
 
   const isFailed = connectionTimeout || Boolean(previewError);
+  const posX = position ? position.x : 0;
+  const posY = position ? position.y : 0;
 
   return (
     <div
       ref={containerRef}
       data-screen-id={screen.id}
       onClick={handleFrameClick}
-      className={`relative flex flex-col rounded-2xl transition-shadow duration-200 group ${
-        isActive
+      className={`absolute flex flex-col rounded-2xl transition-shadow duration-200 group ${
+        isDraggingView
+          ? 'ring-2 ring-indigo-400 shadow-[0_0_60px_-5px_rgba(99,102,241,0.6)] cursor-grabbing'
+          : isActive
           ? 'ring-2 ring-indigo-500/90 shadow-[0_0_50px_-5px_rgba(99,102,241,0.4)]'
           : 'ring-1 ring-white/[0.08] hover:ring-white/[0.18] shadow-2xl'
       } bg-[#0e1013]`}
       style={{
+        left: posX,
+        top: posY,
         width: 1280,
         contain: 'layout paint',
         transform: 'translateZ(0)',
+        zIndex: isDraggingView ? 40 : isActive ? 20 : 1,
       }}
     >
-      {/* Precision Frame Header Bar */}
+      {/* Precision Frame Header Bar & Drag Handle */}
       <div
-        className={`h-11 px-4 rounded-t-2xl flex items-center justify-between border-b transition-colors select-none ${
-          isActive
+        onMouseDown={handleHeaderMouseDown}
+        title="Drag header bar to move this view on the canvas"
+        className={`h-11 px-4 rounded-t-2xl flex items-center justify-between border-b transition-colors select-none cursor-grab active:cursor-grabbing ${
+          isDraggingView
+            ? 'bg-[#1c212b] border-indigo-400/50'
+            : isActive
             ? 'bg-[#15181e] border-indigo-500/30'
             : 'bg-[#121418] border-white/[0.06] group-hover:bg-[#15171b]'
         }`}
       >
-        {/* Left: Screen Name & Index Pill */}
-        <div className="flex items-center gap-3">
+        {/* Left: Move Handle & Screen Name & Index Pill */}
+        <div className="flex items-center gap-2.5">
+          <GripVertical className="w-4 h-4 text-zinc-500 group-hover:text-zinc-300 transition-colors" />
+
           <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-white/[0.05] border border-white/[0.08] text-[11px] font-mono text-zinc-400">
             <span className="text-zinc-500">#{index + 1}</span>
             <span className="text-zinc-200 font-semibold">{screen.name}</span>
@@ -292,7 +357,7 @@ function ScreenPreviewContent({ screen, index }) {
   );
 }
 
-function ScreenPreview({ screen, index }) {
+function ScreenPreview({ screen, index, position }) {
   const dispatch = useDispatch();
   return (
     <RegionErrorBoundary
@@ -308,16 +373,19 @@ function ScreenPreview({ screen, index }) {
         )
       }
     >
-      <ScreenPreviewContent screen={screen} index={index} />
+      <ScreenPreviewContent screen={screen} index={index} position={position} />
     </RegionErrorBoundary>
   );
 }
 
-// Memoize ScreenPreview so it NEVER re-renders on canvas pan/zoom
+// Memoize ScreenPreview so it ONLY re-renders when ITS screen props or position changes
 export default memo(ScreenPreview, (prevProps, nextProps) => {
   return (
     prevProps.screen.id === nextProps.screen.id &&
     prevProps.screen.url === nextProps.screen.url &&
-    prevProps.index === nextProps.index
+    prevProps.index === nextProps.index &&
+    prevProps.position?.x === nextProps.position?.x &&
+    prevProps.position?.y === nextProps.position?.y
   );
 });
+

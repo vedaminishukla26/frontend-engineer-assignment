@@ -4,6 +4,7 @@ import {
   setMode,
   resetView,
   fitToScreen,
+  resetScreenPositions,
   toggleLayers,
   toggleInspector,
 } from '../../store/slices/boardSlice.js';
@@ -12,6 +13,7 @@ import {
   Hand,
   Maximize2,
   LayoutGrid,
+  RotateCcw,
   PanelLeft,
   PanelRight,
   Layers,
@@ -43,7 +45,7 @@ const ModeSwitcher = memo(function ModeSwitcher() {
         className={`relative flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 ${
           mode === 'select'
             ? 'bg-[#1c2024] text-[#ffffff] shadow-sm ring-1 ring-white/[0.12] border border-white/[0.05]'
-            : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.02]'
+            : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04]'
         }`}
       >
         <MousePointer2 className="w-3.5 h-3.5 text-indigo-400" />
@@ -57,7 +59,7 @@ const ModeSwitcher = memo(function ModeSwitcher() {
         className={`relative flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 ${
           mode === 'interact'
             ? 'bg-[#1c2024] text-[#ffffff] shadow-sm ring-1 ring-white/[0.12] border border-white/[0.05]'
-            : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.02]'
+            : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04]'
         }`}
       >
         <Hand className="w-3.5 h-3.5 text-emerald-400" />
@@ -136,6 +138,16 @@ function TopNavbar() {
           <span>100%</span>
         </button>
 
+        <button
+          type="button"
+          onClick={() => dispatch(resetScreenPositions())}
+          title="Reset Screen Layout to Grid"
+          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-[#16191c]/80 backdrop-blur-md hover:bg-[#1c2024] text-zinc-300 hover:text-white border border-white/[0.08] transition-all shadow-sm active:scale-[0.98]"
+        >
+          <RotateCcw className="w-3.5 h-3.5 text-zinc-400" />
+          <span>Reset Layout</span>
+        </button>
+
         <div className="h-4 w-px bg-white/[0.08]" />
 
         {/* Dev Failure Trigger Menu (R6.7) */}
@@ -160,3 +172,4 @@ function TopNavbar() {
 }
 
 export default memo(TopNavbar);
+

@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { setPan, setZoom } from '../store/slices/boardSlice.js';
+import { setPan, setZoom, getDefaultScreenPosition } from '../store/slices/boardSlice.js';
 import { clearSelection, clearHoverElement } from '../store/slices/selectionSlice.js';
 import { hostProtocol } from '../ipc/hostProtocol.js';
 import { IPC_MESSAGES } from '../ipc/messageTypes.js';
@@ -12,7 +12,7 @@ import { AlertCircle, RefreshCw } from 'lucide-react';
 
 function BoardCanvasContent() {
   const dispatch = useDispatch();
-  const { pan, zoom, screens } = useSelector((state) => state.board);
+  const { pan, zoom, screens, screenPositions } = useSelector((state) => state.board);
   const boardError = useSelector((state) => state.error.regionErrors.board);
 
   const containerRef = useRef(null);
@@ -208,15 +208,23 @@ function BoardCanvasContent() {
             backfaceVisibility: 'hidden',
           }}
         >
-          {/* 24-Screen Grid Layout (4 columns x 6 rows) */}
+          {/* Movable 24-Screen Canvas Container */}
           <div
             data-canvas-bg="true"
-            className="grid grid-cols-4 gap-x-20 gap-y-24 p-24"
-            style={{ width: 'max-content' }}
+            className="relative"
+            style={{ width: 6500, height: 6500 }}
           >
-            {screens.map((screen, idx) => (
-              <ScreenPreview key={screen.id} screen={screen} index={idx} />
-            ))}
+            {screens.map((screen, idx) => {
+              const pos = screenPositions[screen.id] || getDefaultScreenPosition(idx);
+              return (
+                <ScreenPreview
+                  key={screen.id}
+                  screen={screen}
+                  index={idx}
+                  position={pos}
+                />
+              );
+            })}
           </div>
         </div>
       )}

@@ -130,7 +130,7 @@ The system is structured as a decoupled **Host-Guest Distributed Model**:
 
 ### Redux State Machine Slices
 
-1. **`boardSlice.js`**: Manages 2D canvas transformation state (`pan: { x, y }`, `zoom: 0.25..4.0`), active interaction mode (`"select"` vs `"interact"`), canvas screen metadata, and sidebar visibility toggles.
+1. **`boardSlice.js`**: Manages 2D canvas transformation state (`pan: { x, y }`, `zoom: 0.25..4.0`), active interaction mode (`"select"` vs `"interact"`), canvas screen metadata, `screenPositions` map `{ [screenId]: { x, y } }` enabling free view dragging on the infinite board, and sidebar visibility toggles.
 2. **`selectionSlice.js`**: Tracks `activeScreenId`, array of `selectedElements` (with bounding rects, CSS paths, names, tags, computed styles), single `hoverElement` descriptor, and `lastSelectedId` for keyboard traversal.
 3. **`layersSlice.js`**: Maintains tree node registries per preview, expanded node IDs per screen, search query filter, lazy loading state per node ID (`loading`, `error`, `retryCount`), and search match results.
 4. **`inspectorSlice.js`**: Stores API details metadata (`component`, `description`, `status`, `owner`), loading state, HTTP 404 status (`is404`), and multi-selection aggregated values (`"Mixed"` vs uniform values).
