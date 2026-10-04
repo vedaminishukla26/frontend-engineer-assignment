@@ -17,6 +17,7 @@ import {
   let currentMode = 'select'; // 'select' | 'interact'
   const hostWindow = window.parent;
   let lastHoveredElement = null;
+  let activeSelectedNodes = new Map(); // Map<string (id), HTMLElement>
 
   // --- Send Message to Host ---
   function postToHost(type, payload = {}) {
@@ -72,14 +73,20 @@ import {
     e.stopPropagation();
     e.stopImmediatePropagation();
 
+    if (!e.shiftKey) {
+      activeSelectedNodes.clear();
+    }
+
     const target = document.elementFromPoint(e.clientX, e.clientY);
     if (!target || target === document.body || target === document.documentElement) {
+      activeSelectedNodes.clear();
       postToHost(IPC.CLEAR_SELECTION);
       return;
     }
 
     const data = serializeElement(target);
     if (data) {
+      activeSelectedNodes.set(data.id, target);
       postToHost(IPC.ELEMENT_SELECT, {
         element: data,
         shiftKey: Boolean(e.shiftKey),
@@ -233,10 +240,14 @@ import {
       }
 
       case IPC.SCROLL_INTO_VIEW: {
-        const { id, key } = data.payload || {};
-        const el = findElementByDescriptor({ id, key });
-        if (el && typeof el.scrollIntoView === 'function') {
-          el.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
+        const { id, key, path } = data.payload || {};
+        const el = findElementByDescriptor({ id, key, path });
+        if (el) {
+          const s = serializeElement(el);
+          if (s) activeSelectedNodes.set(s.id, el);
+          if (typeof el.scrollIntoView === 'function') {
+            el.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
+          }
         }
         break;
       }
@@ -276,6 +287,11 @@ import {
           }
         }
 
+        if (nextEl) {
+          const s = serializeElement(nextEl);
+          if (s) activeSelectedNodes.set(s.id, nextEl);
+        }
+
         postToHost(IPC.KEYBOARD_NAV_RESP, {
           element: nextEl ? serializeElement(nextEl) : null,
         });
@@ -286,17 +302,37 @@ import {
         const { requestId, descriptors } = data.payload || {};
         const updated = [];
         const vanishedIds = [];
+        const newSelectedNodes = new Map();
 
         (descriptors || []).forEach((desc) => {
-          const el = findElementByDescriptor(desc);
-          if (el) {
+          let el = activeSelectedNodes.get(desc.id);
+
+          // 1. Direct live DOM Node reference check (handles sibling insertions & path shifts smoothly)
+          if (el && el.isConnected) {
             const s = serializeElement(el);
-            if (s) updated.push(s);
-            else vanishedIds.push(desc.id);
-          } else {
-            vanishedIds.push(desc.id);
+            if (s) {
+              newSelectedNodes.set(s.id, el);
+              updated.push(s);
+              return;
+            }
           }
+
+          // 2. Fallback search by descriptor & fingerprint if DOM node was unmounted
+          el = findElementByDescriptor(desc);
+          if (el && el.isConnected) {
+            const s = serializeElement(el);
+            if (s) {
+              newSelectedNodes.set(s.id, el);
+              updated.push(s);
+              return;
+            }
+          }
+
+          // 3. Element no longer exists
+          vanishedIds.push(desc.id);
         });
+
+        activeSelectedNodes = newSelectedNodes;
 
         postToHost(IPC.RECONCILE_RESP, { requestId, updated, vanishedIds });
         break;

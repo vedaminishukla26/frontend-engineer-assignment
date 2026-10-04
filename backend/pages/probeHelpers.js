@@ -29,15 +29,17 @@ export function getElementName(el) {
  */
 export function getElementPath(el) {
   if (!el || el.nodeType !== Node.ELEMENT_NODE) return '';
-  if (el.dataset && el.dataset.key) {
-    return `[data-key="${el.dataset.key}"]`;
-  }
   if (el === document.body) return 'body';
   if (el === document.documentElement) return 'html';
 
   let path = '';
   let curr = el;
   while (curr && curr !== document.body && curr !== document.documentElement) {
+    if (curr.dataset && curr.dataset.key) {
+      const keySelector = `[data-key="${curr.dataset.key}"]`;
+      path = path ? `${keySelector} > ${path}` : keySelector;
+      return path;
+    }
     const parent = curr.parentElement;
     if (!parent) break;
     const siblings = Array.from(parent.children).filter((c) => c.tagName === curr.tagName);
@@ -55,35 +57,81 @@ export function getElementPath(el) {
  */
 export function findElementByDescriptor(desc) {
   if (!desc) return null;
+
+  // 1. Keyed element match (data-key attribute is unique & stable across re-renders)
   if (desc.key) {
     const el = document.querySelector(`[data-key="${desc.key}"]`);
     if (el) return el;
   }
-  if (desc.id) {
-    if (desc.id.startsWith('key:')) {
-      const keyVal = desc.id.slice(4);
-      const el = document.querySelector(`[data-key="${keyVal}"]`);
-      if (el) return el;
-    } else if (desc.id.startsWith('[data-key=')) {
-      const el = document.querySelector(desc.id);
-      if (el) return el;
-    } else {
-      try {
-        const el = document.querySelector(desc.id);
-        if (el) return el;
-      } catch (e) {
-        // Fallback for complex selectors
-      }
-    }
+  if (desc.id && desc.id.startsWith('key:')) {
+    const keyVal = desc.id.slice(4);
+    const el = document.querySelector(`[data-key="${keyVal}"]`);
+    if (el) return el;
   }
-  if (desc.path) {
+
+  // If path contains [data-key=], it is scoped to a keyed container
+  const pathSelector = desc.path || desc.id;
+  if (pathSelector && pathSelector.includes('[data-key=')) {
     try {
-      const el = document.querySelector(desc.path);
-      if (el) return el;
-    } catch (e) {
-      // Ignore selector errors
-    }
+      const candidate = document.querySelector(pathSelector);
+      if (candidate) return candidate;
+    } catch (e) {}
   }
+
+  // 2. Exact or Prefix text match on pathSelector
+  if (pathSelector && !pathSelector.startsWith('key:')) {
+    try {
+      const candidate = document.querySelector(pathSelector);
+      if (candidate) {
+        const candText = (candidate.textContent || '').trim().slice(0, 80);
+        const candTag = candidate.tagName.toLowerCase();
+        const expectedTag = desc.tag ? desc.tag.toLowerCase() : null;
+
+        const isTagMatch = !expectedTag || candTag === expectedTag;
+
+        if (isTagMatch) {
+          if (!desc.text) return candidate;
+          const targetText = (desc.text || '').trim().slice(0, 80);
+          if (candText === targetText) return candidate;
+
+          // Match prefix text (ignores changing relative time strings like "2s ago" -> "4s ago")
+          const minLen = Math.min(candText.length, targetText.length, 20);
+          if (minLen >= 5 && candText.slice(0, minLen) === targetText.slice(0, minLen)) {
+            return candidate;
+          }
+        }
+      }
+    } catch (e) {}
+  }
+
+  // 3. Fingerprint Search across DOM for un-keyed elements
+  if (desc.tag || desc.text) {
+    const expectedTag = (desc.tag || '*').toLowerCase();
+    try {
+      const candidates = Array.from(document.querySelectorAll(expectedTag));
+      const targetText = (desc.text || '').trim().slice(0, 80);
+
+      for (const cand of candidates) {
+        if (cand === document.body || cand === document.documentElement) continue;
+        const candText = (cand.textContent || '').trim().slice(0, 80);
+        const candElId = cand.id || '';
+
+        const matchTag = !desc.tag || cand.tagName.toLowerCase() === desc.tag.toLowerCase();
+        const matchElId = !desc.elementId || candElId === desc.elementId;
+
+        if (matchTag && matchElId && targetText) {
+          if (candText === targetText) return cand;
+          const minLen = Math.min(candText.length, targetText.length, 20);
+          if (minLen >= 5 && candText.slice(0, minLen) === targetText.slice(0, minLen)) {
+            return cand;
+          }
+        }
+      }
+    } catch (e) {}
+  }
+
+  // Note: Never fall back to arbitrary index selectors if text/fingerprint fails.
+  // Returning null allows host to declare element deleted (R3.7) instead of jumping to wrong element.
   return null;
 }
 

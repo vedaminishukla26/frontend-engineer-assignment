@@ -56,6 +56,9 @@ const inspectorSlice = createSlice({
       .addCase(fetchElementDetails.pending, (state, action) => {
         state.detailsStatus = 'loading';
         state.detailsError = null;
+        if (action.meta?.arg?.key) {
+          state.currentKey = action.meta.arg.key;
+        }
       })
       .addCase(fetchElementDetails.fulfilled, (state, action) => {
         if (!action.payload) {
@@ -64,9 +67,11 @@ const inspectorSlice = createSlice({
         }
         if (action.payload.is404) {
           state.detailsStatus = 'notFound';
+          state.currentKey = action.payload.key;
           return;
         }
         state.detailsStatus = 'succeeded';
+        state.currentKey = action.payload.key;
         state.detailsByKey[action.payload.key] = action.payload;
       })
       .addCase(fetchElementDetails.rejected, (state, action) => {

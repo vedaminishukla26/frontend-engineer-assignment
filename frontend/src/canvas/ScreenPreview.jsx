@@ -95,6 +95,11 @@ function ScreenPreview({ screen, index }) {
               id: el.id,
               key: el.key,
               path: el.path,
+              name: el.name,
+              tag: el.tag,
+              text: el.text,
+              elementId: el.elementId,
+              className: el.className,
             })),
           });
         }
