@@ -18,6 +18,8 @@ import { hostProtocol } from '../../ipc/hostProtocol.js';
 import { IPC_MESSAGES } from '../../ipc/messageTypes.js';
 import LayerTreeItem from './LayerTreeItem.jsx';
 import { Layers, Search, PanelLeftClose, X, RefreshCw, AlertCircle } from 'lucide-react';
+import RegionErrorBoundary from '../common/RegionErrorBoundary.jsx';
+import { recordRegionalError, clearRegionalError } from '../../store/slices/errorSlice.js';
 
 function LayersPanel() {
   const dispatch = useDispatch();
@@ -454,4 +456,25 @@ function LayersPanel() {
   );
 }
 
-export default memo(LayersPanel);
+function LayersPanelWrapper() {
+  const dispatch = useDispatch();
+  return (
+    <RegionErrorBoundary
+      region="layers"
+      regionName="Layers Panel"
+      onError={(err) =>
+        dispatch(
+          recordRegionalError({
+            region: 'layers',
+            error: err?.message || 'Layers panel render error',
+          })
+        )
+      }
+      onRetry={() => dispatch(clearRegionalError({ region: 'layers' }))}
+    >
+      <LayersPanel />
+    </RegionErrorBoundary>
+  );
+}
+
+export default memo(LayersPanelWrapper);

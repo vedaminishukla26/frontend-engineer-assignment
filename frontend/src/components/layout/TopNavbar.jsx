@@ -17,6 +17,7 @@ import {
   Layers,
   Sliders,
 } from 'lucide-react';
+import DevFailureMenu from './DevFailureMenu.jsx';
 
 // Zoom badge isolated so only this tiny text updates on zoom
 const ZoomBadge = memo(function ZoomBadge() {
@@ -136,6 +137,9 @@ function TopNavbar() {
         </button>
 
         <div className="h-4 w-px bg-white/[0.08]" />
+
+        {/* Dev Failure Trigger Menu (R6.7) */}
+        <DevFailureMenu />
 
         {/* Toggle Inspector Sidebar Button */}
         <button

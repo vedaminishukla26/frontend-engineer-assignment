@@ -89,13 +89,19 @@ function StatusBadge({ status }) {
   );
 }
 
-function InspectorPanel() {
+import RegionErrorBoundary from '../common/RegionErrorBoundary.jsx';
+import { recordRegionalError, clearRegionalError } from '../../store/slices/errorSlice.js';
+
+function InspectorPanelContent() {
   const dispatch = useDispatch();
   const currentPromiseRef = useRef(null);
 
   const showInspector = useSelector((state) => state.board.showInspector);
   const selectedElements = useSelector((state) => state.selection.selectedElements);
   const isElementDeleted = useSelector((state) => state.selection.isElementDeleted);
+
+  const inspectorError = useSelector((state) => state.error.regionErrors.inspector);
+  const detailsRegionError = useSelector((state) => state.error.regionErrors.details);
 
   const detailsByKey = useSelector((state) => state.inspector.detailsByKey);
   const detailsStatus = useSelector((state) => state.inspector.detailsStatus);
@@ -125,6 +131,7 @@ function InspectorPanel() {
   }, [count, elementKey, dispatch]);
 
   const handleRetryDetails = () => {
+    dispatch(clearRegionalError({ region: 'details' }));
     if (elementKey) {
       dispatch(fetchElementDetails({ key: elementKey }));
     }
@@ -170,6 +177,7 @@ function InspectorPanel() {
   );
 
   const cachedDetails = elementKey ? detailsByKey[elementKey] : null;
+  const activeDetailsError = detailsRegionError || detailsError;
 
   return (
     <aside
@@ -202,7 +210,27 @@ function InspectorPanel() {
 
       {/* Main Body */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4 min-w-[320px] bg-[#0c0d10] scrollbar-thin">
-        {isElementDeleted ? (
+        {inspectorError ? (
+          <div className="p-6 flex flex-col items-center justify-center text-center text-xs space-y-3 h-full">
+            <div className="w-10 h-10 rounded-xl bg-rose-950/40 border border-rose-500/30 flex items-center justify-center text-rose-400">
+              <AlertCircle className="w-5 h-5" />
+            </div>
+            <div className="space-y-1">
+              <p className="text-xs font-semibold text-rose-200 uppercase tracking-wider">
+                Inspector Error
+              </p>
+              <p className="text-[11px] text-rose-400/90">{inspectorError}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => dispatch(clearRegionalError({ region: 'inspector' }))}
+              className="px-3 py-1.5 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors shadow-sm"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              <span>Retry Inspector</span>
+            </button>
+          </div>
+        ) : isElementDeleted ? (
           <div className="p-6 flex flex-col items-center justify-center text-center text-xs space-y-2 h-full">
             <div className="w-9 h-9 rounded-xl bg-amber-950/30 border border-amber-500/20 flex items-center justify-center text-amber-400">
               <AlertCircle className="w-5 h-5" />
@@ -291,96 +319,132 @@ function InspectorPanel() {
               </div>
             </div>
 
-            {/* DETAILS SECTION (R5.1 - Only for single selection) */}
+            {/* DETAILS SECTION (R5.1 & R6.2 - Only for single selection) */}
             {count === 1 && (
-              <div className="bg-[#111318] border border-white/[0.06] rounded-xl p-3.5 space-y-3">
-                <div className="flex items-center justify-between border-b border-white/[0.06] pb-2">
-                  <span className="text-xs font-semibold text-zinc-200 flex items-center gap-1.5">
-                    <Box className="w-3.5 h-3.5 text-indigo-400" />
-                    Element Details
-                  </span>
-                  <span className="text-[10px] font-mono text-zinc-500 uppercase">GET /elements/:key</span>
-                </div>
-
-                {!elementKey ? (
-                  <div className="p-3 bg-[#14161a] border border-white/[0.06] rounded-lg text-xs text-zinc-400 space-y-1">
-                    <div className="flex items-center gap-1.5 text-zinc-300 font-medium">
-                      <Info className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
-                      <span>No details</span>
-                    </div>
-                    <p className="text-[11px] text-zinc-500 leading-normal">
-                      This element does not carry a <code className="text-zinc-300 bg-white/[0.06] px-1 py-0.5 rounded font-mono">data-key</code> attribute.
-                    </p>
+              <RegionErrorBoundary
+                region="details"
+                regionName="Element Details"
+                onError={(err) =>
+                  dispatch(
+                    recordRegionalError({
+                      region: 'details',
+                      elementKey,
+                      error: err?.message || 'Details render error',
+                    })
+                  )
+                }
+                onRetry={() => dispatch(clearRegionalError({ region: 'details' }))}
+              >
+                <div className="bg-[#111318] border border-white/[0.06] rounded-xl p-3.5 space-y-3">
+                  <div className="flex items-center justify-between border-b border-white/[0.06] pb-2">
+                    <span className="text-xs font-semibold text-zinc-200 flex items-center gap-1.5">
+                      <Box className="w-3.5 h-3.5 text-indigo-400" />
+                      Element Details
+                    </span>
+                    <span className="text-[10px] font-mono text-zinc-500 uppercase">GET /elements/:key</span>
                   </div>
-                ) : detailsStatus === 'loading' && !cachedDetails ? (
-                  <div className="p-4 bg-[#14161a] border border-white/[0.06] rounded-lg text-xs text-zinc-400 flex items-center gap-2.5">
-                    <Loader2 className="w-4 h-4 animate-spin text-indigo-400 shrink-0" />
-                    <span>Fetching metadata for key <code className="font-mono text-indigo-300">{elementKey}</code>...</span>
-                  </div>
-                ) : detailsStatus === 'notFound' ? (
-                  <div className="p-3 bg-[#14161a] border border-white/[0.06] rounded-lg text-xs text-zinc-400 space-y-1">
-                    <div className="flex items-center gap-1.5 text-zinc-300 font-medium">
-                      <FileQuestion className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                      <span>No details for this element</span>
-                    </div>
-                    <p className="text-[11px] text-zinc-500 leading-normal">
-                      No API record was found for key <code className="text-amber-300 font-mono">{elementKey}</code> (HTTP 404).
-                    </p>
-                  </div>
-                ) : detailsStatus === 'failed' && !cachedDetails ? (
-                  <div className="p-3 bg-rose-950/20 border border-rose-500/30 rounded-lg text-xs text-rose-300 space-y-2">
-                    <div className="flex items-center gap-1.5 text-rose-200 font-medium">
-                      <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
-                      <span>Failed to load details</span>
-                    </div>
-                    <p className="text-[11px] text-rose-400/80">{detailsError || 'API request failed'}</p>
-                    <button
-                      type="button"
-                      onClick={handleRetryDetails}
-                      className="px-2.5 py-1 bg-rose-600 hover:bg-rose-500 text-white rounded text-[11px] font-medium flex items-center gap-1 transition-colors"
-                    >
-                      <RefreshCw className="w-3 h-3" />
-                      <span>Retry</span>
-                    </button>
-                  </div>
-                ) : cachedDetails || detailsStatus === 'succeeded' ? (
-                  <div className="space-y-2.5 text-xs">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-medium text-zinc-400 uppercase tracking-wider">Component</span>
-                      <span className="font-mono text-xs text-indigo-300 font-semibold bg-indigo-950/40 border border-indigo-500/20 px-2 py-0.5 rounded">
-                        {cachedDetails?.component || '—'}
-                      </span>
-                    </div>
 
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-medium text-zinc-400 uppercase tracking-wider">Status</span>
-                      <StatusBadge status={cachedDetails?.status} />
-                    </div>
-
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-medium text-zinc-400 uppercase tracking-wider">Owner</span>
-                      <span className="text-xs text-zinc-200 flex items-center gap-1 font-mono">
-                        <UserCheck className="w-3 h-3 text-zinc-400" />
-                        {cachedDetails?.owner || '—'}
-                      </span>
-                    </div>
-
-                    <div className="pt-2 border-t border-white/[0.04]">
-                      <span className="text-[10px] font-medium text-zinc-400 uppercase tracking-wider block mb-1">
-                        Description
-                      </span>
-                      <p className="text-xs text-zinc-300 bg-[#14161a] p-2.5 rounded-lg border border-white/[0.06] leading-relaxed font-sans">
-                        {cachedDetails?.description || 'No description provided.'}
+                  {!elementKey ? (
+                    <div className="p-3 bg-[#14161a] border border-white/[0.06] rounded-lg text-xs text-zinc-400 space-y-1">
+                      <div className="flex items-center gap-1.5 text-zinc-300 font-medium">
+                        <Info className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                        <span>No details</span>
+                      </div>
+                      <p className="text-[11px] text-zinc-500 leading-normal">
+                        This element does not carry a <code className="text-zinc-300 bg-white/[0.06] px-1 py-0.5 rounded font-mono">data-key</code> attribute.
                       </p>
                     </div>
-                  </div>
-                ) : null}
-              </div>
+                  ) : detailsStatus === 'loading' && !cachedDetails ? (
+                    <div className="p-4 bg-[#14161a] border border-white/[0.06] rounded-lg text-xs text-zinc-400 flex items-center gap-2.5">
+                      <Loader2 className="w-4 h-4 animate-spin text-indigo-400 shrink-0" />
+                      <span>Fetching metadata for key <code className="font-mono text-indigo-300">{elementKey}</code>...</span>
+                    </div>
+                  ) : detailsStatus === 'notFound' ? (
+                    <div className="p-3 bg-[#14161a] border border-white/[0.06] rounded-lg text-xs text-zinc-400 space-y-1">
+                      <div className="flex items-center gap-1.5 text-zinc-300 font-medium">
+                        <FileQuestion className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                        <span>No details for this element</span>
+                      </div>
+                      <p className="text-[11px] text-zinc-500 leading-normal">
+                        No API record was found for key <code className="text-amber-300 font-mono">{elementKey}</code> (HTTP 404).
+                      </p>
+                    </div>
+                  ) : activeDetailsError ? (
+                    <div className="p-3 bg-rose-950/20 border border-rose-500/30 rounded-lg text-xs text-rose-300 space-y-2">
+                      <div className="flex items-center gap-1.5 text-rose-200 font-medium">
+                        <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+                        <span>Failed to load details</span>
+                      </div>
+                      <p className="text-[11px] text-rose-400/80">{activeDetailsError}</p>
+                      <button
+                        type="button"
+                        onClick={handleRetryDetails}
+                        className="px-2.5 py-1 bg-rose-600 hover:bg-rose-500 text-white rounded text-[11px] font-medium flex items-center gap-1 transition-colors"
+                      >
+                        <RefreshCw className="w-3 h-3" />
+                        <span>Retry Details</span>
+                      </button>
+                    </div>
+                  ) : cachedDetails || detailsStatus === 'succeeded' ? (
+                    <div className="space-y-2.5 text-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-medium text-zinc-400 uppercase tracking-wider">Component</span>
+                        <span className="font-mono text-xs text-indigo-300 font-semibold bg-indigo-950/40 border border-indigo-500/20 px-2 py-0.5 rounded">
+                          {cachedDetails?.component || '—'}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-medium text-zinc-400 uppercase tracking-wider">Status</span>
+                        <StatusBadge status={cachedDetails?.status} />
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-medium text-zinc-400 uppercase tracking-wider">Owner</span>
+                        <span className="text-xs text-zinc-200 flex items-center gap-1 font-mono">
+                          <UserCheck className="w-3 h-3 text-zinc-400" />
+                          {cachedDetails?.owner || '—'}
+                        </span>
+                      </div>
+
+                      <div className="pt-2 border-t border-white/[0.04]">
+                        <span className="text-[10px] font-medium text-zinc-400 uppercase tracking-wider block mb-1">
+                          Description
+                        </span>
+                        <p className="text-xs text-zinc-300 bg-[#14161a] p-2.5 rounded-lg border border-white/[0.06] leading-relaxed font-sans">
+                          {cachedDetails?.description || 'No description provided.'}
+                        </p>
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              </RegionErrorBoundary>
             )}
           </>
         )}
       </div>
     </aside>
+  );
+}
+
+function InspectorPanel() {
+  const dispatch = useDispatch();
+  return (
+    <RegionErrorBoundary
+      region="inspector"
+      regionName="Inspector Panel"
+      onError={(err) =>
+        dispatch(
+          recordRegionalError({
+            region: 'inspector',
+            error: err?.message || 'Inspector render error',
+          })
+        )
+      }
+      onRetry={() => dispatch(clearRegionalError({ region: 'inspector' }))}
+    >
+      <InspectorPanelContent />
+    </RegionErrorBoundary>
   );
 }
 

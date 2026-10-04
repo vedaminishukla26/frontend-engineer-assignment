@@ -111,6 +111,21 @@ import {
   window.addEventListener('submit', handleGenericSuppression, true);
   window.addEventListener('dblclick', handleGenericSuppression, true);
 
+  // Intercept inside-page runtime errors (R6.3)
+  window.addEventListener('error', (event) => {
+    postToHost(IPC.PAGE_ERROR, {
+      message: event.message || 'Page runtime error',
+      filename: event.filename,
+      lineno: event.lineno,
+    });
+  });
+
+  window.addEventListener('unhandledrejection', (event) => {
+    postToHost(IPC.PAGE_ERROR, {
+      message: event.reason?.message || 'Unhandled promise rejection',
+    });
+  });
+
   // Wheel handling: Ctrl/Cmd + wheel zooms board (R1.3), normal wheel scrolls preview (R1.4)
   function handleWheel(e) {
     if (e.ctrlKey || e.metaKey) {

@@ -6,9 +6,14 @@ import { hostProtocol } from '../ipc/hostProtocol.js';
 import { IPC_MESSAGES } from '../ipc/messageTypes.js';
 import ScreenPreview from './ScreenPreview.jsx';
 
-export default function BoardCanvas() {
+import RegionErrorBoundary from '../components/common/RegionErrorBoundary.jsx';
+import { clearRegionalError } from '../store/slices/errorSlice.js';
+import { AlertCircle, RefreshCw } from 'lucide-react';
+
+function BoardCanvasContent() {
   const dispatch = useDispatch();
   const { pan, zoom, screens } = useSelector((state) => state.board);
+  const boardError = useSelector((state) => state.error.regionErrors.board);
 
   const containerRef = useRef(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -170,33 +175,73 @@ export default function BoardCanvas() {
         touchAction: 'none',
       }}
     >
-      {/* 2D Zoom & Pan Transform Container */}
-      <div
-        data-canvas-bg="true"
-        className="absolute top-0 left-0"
-        style={{
-          transform: `translate3d(${pan.x}px, ${pan.y}px, 0px) scale(${zoom})`,
-          transformOrigin: '0 0',
-          willChange: 'transform',
-          backfaceVisibility: 'hidden',
-        }}
-      >
-        {/* 24-Screen Grid Layout (4 columns x 6 rows) */}
+      {/* Board Error Overlay (R6.2) */}
+      {boardError ? (
+        <div className="absolute inset-0 z-50 bg-[#0c0d10]/95 backdrop-blur-md flex flex-col items-center justify-center p-8 text-center space-y-4">
+          <div className="w-12 h-12 rounded-2xl bg-rose-950/50 border border-rose-500/30 flex items-center justify-center text-rose-400">
+            <AlertCircle className="w-6 h-6" />
+          </div>
+          <div className="space-y-1 max-w-md">
+            <h2 className="text-base font-bold text-rose-200 uppercase tracking-wider">
+              Board Failure
+            </h2>
+            <p className="text-xs text-rose-300 leading-relaxed">{boardError}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => dispatch(clearRegionalError({ region: 'board' }))}
+            className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-semibold flex items-center gap-2 transition-all shadow-lg active:scale-[0.98]"
+          >
+            <RefreshCw className="w-4 h-4" />
+            <span>Retry Board</span>
+          </button>
+        </div>
+      ) : (
+        /* 2D Zoom & Pan Transform Container */
         <div
           data-canvas-bg="true"
-          className="grid grid-cols-4 gap-x-20 gap-y-24 p-24"
-          style={{ width: 'max-content' }}
+          className="absolute top-0 left-0"
+          style={{
+            transform: `translate3d(${pan.x}px, ${pan.y}px, 0px) scale(${zoom})`,
+            transformOrigin: '0 0',
+            willChange: 'transform',
+            backfaceVisibility: 'hidden',
+          }}
         >
-          {screens.map((screen, idx) => (
-            <ScreenPreview key={screen.id} screen={screen} index={idx} />
-          ))}
+          {/* 24-Screen Grid Layout (4 columns x 6 rows) */}
+          <div
+            data-canvas-bg="true"
+            className="grid grid-cols-4 gap-x-20 gap-y-24 p-24"
+            style={{ width: 'max-content' }}
+          >
+            {screens.map((screen, idx) => (
+              <ScreenPreview key={screen.id} screen={screen} index={idx} />
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Transparent Drag Interaction Shield (Prevents iframe mouse throttling during pan) */}
       {isDragging && (
         <div className="absolute inset-0 z-50 cursor-grabbing pointer-events-auto" />
       )}
     </div>
+  );
+}
+
+export default function BoardCanvas() {
+  const dispatch = useDispatch();
+  return (
+    <RegionErrorBoundary
+      region="board"
+      regionName="Board"
+      onError={(err) =>
+        dispatch(
+          clearRegionalError({ region: 'board' })
+        )
+      }
+    >
+      <BoardCanvasContent />
+    </RegionErrorBoundary>
   );
 }

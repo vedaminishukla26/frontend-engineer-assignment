@@ -15,7 +15,10 @@ import HoverOverlay from './HoverOverlay.jsx';
 import SelectionOverlay from './SelectionOverlay.jsx';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 
-function ScreenPreview({ screen, index }) {
+import RegionErrorBoundary from '../components/common/RegionErrorBoundary.jsx';
+import { recordRegionalError, clearRegionalError, addPageRuntimeError } from '../store/slices/errorSlice.js';
+
+function ScreenPreviewContent({ screen, index }) {
   const dispatch = useDispatch();
   const iframeRef = useRef(null);
   const containerRef = useRef(null);
@@ -24,6 +27,10 @@ function ScreenPreview({ screen, index }) {
   const isActive = useSelector((state) => state.selection.activeScreenId === screen.id);
   const selectedElements = useSelector((state) => state.selection.selectedElements);
   const mode = useSelector((state) => state.board.mode);
+
+  const previewError = useSelector((state) => state.error.regionErrors.preview[screen.id]);
+  const pageErrors = useSelector((state) => state.error.pageErrorsByScreen[screen.id]);
+  const latestPageError = pageErrors && pageErrors.length > 0 ? pageErrors[pageErrors.length - 1] : null;
 
   const selectedElementsRef = useRef(selectedElements);
   const isActiveRef = useRef(isActive);
@@ -35,7 +42,6 @@ function ScreenPreview({ screen, index }) {
   }, [isActive]);
 
   const [isConnected, setIsConnected] = useState(false);
-  const [pageError, setPageError] = useState(null);
   const [connectionTimeout, setConnectionTimeout] = useState(false);
 
   // Register iframe with Host Protocol on mount
@@ -49,6 +55,13 @@ function ScreenPreview({ screen, index }) {
     const timeoutTimer = setTimeout(() => {
       if (!isConnected) {
         setConnectionTimeout(true);
+        dispatch(
+          recordRegionalError({
+            region: 'preview',
+            screenId: screen.id,
+            error: "Couldn't connect to this preview",
+          })
+        );
       }
     }, 10000);
 
@@ -56,7 +69,7 @@ function ScreenPreview({ screen, index }) {
       clearTimeout(timeoutTimer);
       hostProtocol.unregisterIframe(screen.id);
     };
-  }, [screen.id, isConnected]);
+  }, [screen.id, isConnected, dispatch]);
 
   // Subscribe to IPC messages for this screen
   useEffect(() => {
@@ -121,9 +134,15 @@ function ScreenPreview({ screen, index }) {
           );
         }
       } else if (type === IPC_MESSAGES.PAGE_ERROR) {
-        setPageError(payload?.message || 'Page script error');
+        dispatch(
+          addPageRuntimeError({
+            screenId: screen.id,
+            message: payload?.message || 'Page script error',
+            filename: payload?.filename,
+            lineno: payload?.lineno,
+          })
+        );
       } else if (type === IPC_MESSAGES.PAGE_NAVIGATED) {
-        setPageError(null);
         dispatch(clearSelection());
       }
     });
@@ -139,11 +158,13 @@ function ScreenPreview({ screen, index }) {
     e.stopPropagation();
     setConnectionTimeout(false);
     setIsConnected(false);
-    setPageError(null);
+    dispatch(clearRegionalError({ region: 'preview', screenId: screen.id }));
     if (iframeRef.current) {
       iframeRef.current.src = screen.url;
     }
   };
+
+  const isFailed = connectionTimeout || Boolean(previewError);
 
   return (
     <div
@@ -186,9 +207,9 @@ function ScreenPreview({ screen, index }) {
         {/* Right: Screen Dimensions, Connection Dot & Status Badges */}
         <div className="flex items-center gap-2.5">
           {/* Page Error Badge (R6.3) */}
-          {pageError && (
+          {latestPageError && (
             <div
-              title={pageError}
+              title={latestPageError.message}
               className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-rose-950/60 border border-rose-500/30 text-rose-300 text-[10px] font-medium"
             >
               <AlertTriangle className="w-3 h-3 text-rose-400" />
@@ -197,10 +218,11 @@ function ScreenPreview({ screen, index }) {
           )}
 
           {/* Connection Status Indicator */}
-          {connectionTimeout ? (
+          {isFailed ? (
             <button
+              type="button"
               onClick={handleReload}
-              className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-950/60 border border-amber-500/30 text-amber-300 text-[10px] font-medium hover:bg-amber-900/60 transition-all"
+              className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-rose-950/60 border border-rose-500/30 text-rose-300 text-[10px] font-medium hover:bg-rose-900/60 transition-all"
             >
               <RefreshCw className="w-3 h-3" />
               <span>Retry connection</span>
@@ -246,19 +268,19 @@ function ScreenPreview({ screen, index }) {
         <SelectionOverlay screenId={screen.id} />
 
         {/* Connection Failure Overlay (R6.2) */}
-        {connectionTimeout && !isConnected && (
+        {isFailed && !isConnected && (
           <div className="absolute inset-0 bg-[#0e1013]/90 backdrop-blur-sm flex flex-col items-center justify-center p-6 text-center space-y-3 z-10">
-            <AlertTriangle className="w-8 h-8 text-amber-400" />
-            <div className="text-sm font-semibold text-zinc-100">
+            <AlertTriangle className="w-8 h-8 text-rose-400" />
+            <div className="text-sm font-semibold text-rose-200">
               Couldn't connect to this preview
             </div>
-            <p className="text-xs text-zinc-400 max-w-sm">
-              The preview script did not respond within 10 seconds. Verify the preview server is running on :4001.
+            <p className="text-xs text-rose-300/80 max-w-sm">
+              {previewError || "The preview script did not respond within 10 seconds. Verify the preview server is running on :4001."}
             </p>
             <button
               type="button"
               onClick={handleReload}
-              className="px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-md active:scale-[0.98] transition-all flex items-center gap-1.5"
+              className="px-3.5 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold shadow-md active:scale-[0.98] transition-all flex items-center gap-1.5"
             >
               <RefreshCw className="w-3.5 h-3.5" />
               <span>Retry Connection</span>
@@ -267,6 +289,27 @@ function ScreenPreview({ screen, index }) {
         )}
       </div>
     </div>
+  );
+}
+
+function ScreenPreview({ screen, index }) {
+  const dispatch = useDispatch();
+  return (
+    <RegionErrorBoundary
+      region="preview"
+      regionName={`Preview (${screen.name})`}
+      onError={(err) =>
+        dispatch(
+          recordRegionalError({
+            region: 'preview',
+            screenId: screen.id,
+            error: err?.message || "Couldn't connect to this preview",
+          })
+        )
+      }
+    >
+      <ScreenPreviewContent screen={screen} index={index} />
+    </RegionErrorBoundary>
   );
 }
 
