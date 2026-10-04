@@ -162,11 +162,7 @@ import {
         if (parentKey) {
           parentEl = document.querySelector(`[data-key="${parentKey}"]`) || document.body;
         } else if (parentPath && parentPath !== 'body') {
-          try {
-            parentEl = document.querySelector(parentPath) || document.body;
-          } catch (err) {
-            parentEl = document.body;
-          }
+          parentEl = findElementByDescriptor({ id: parentPath, key: parentKey, path: parentPath }) || document.body;
         }
 
         const childElements = Array.from(parentEl.children).filter(
@@ -204,11 +200,24 @@ import {
           all.forEach((el) => {
             if (el.tagName.toLowerCase() === 'script') return;
             const name = getElementName(el);
-            if (name.toLowerCase().includes(q)) {
+            const tag = el.tagName.toLowerCase();
+            const text = (el.textContent || '').trim().slice(0, 80);
+            const id = el.id || '';
+            const cls = typeof el.className === 'string' ? el.className : '';
+            const key = el.dataset?.key || '';
+
+            if (
+              name.toLowerCase().includes(q) ||
+              tag.includes(q) ||
+              text.toLowerCase().includes(q) ||
+              id.toLowerCase().includes(q) ||
+              cls.toLowerCase().includes(q) ||
+              key.toLowerCase().includes(q)
+            ) {
               const ancestors = [];
               let p = el.parentElement;
-              while (p && p !== document.body && p !== document.documentElement) {
-                ancestors.unshift(getElementPath(p));
+              while (p && p !== document.documentElement) {
+                ancestors.unshift(p === document.body ? 'body' : getElementPath(p));
                 p = p.parentElement;
               }
               results.push({

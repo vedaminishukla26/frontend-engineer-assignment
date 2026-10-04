@@ -1,15 +1,90 @@
-import { createSlice } from '@reduxjs/toolkit';
+import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
+import { hostProtocol } from '../../ipc/hostProtocol.js';
+import { IPC_MESSAGES } from '../../ipc/messageTypes.js';
+
+export const fetchTreeChildren = createAsyncThunk(
+  'layers/fetchTreeChildren',
+  async ({ screenId, parentPath = 'body', parentKey = null }, { dispatch, rejectWithValue }) => {
+    const rowKey = `${screenId}:${parentPath}`;
+    dispatch(setRowLoading({ rowKey, loading: true }));
+
+    try {
+      const res = await hostProtocol.sendRpc(
+        screenId,
+        IPC_MESSAGES.QUERY_CHILDREN_REQ,
+        { parentPath, parentKey },
+        3000 // 3s timeout per R4.2
+      );
+
+      dispatch(
+        setTreeNodes({
+          screenId,
+          parentPath: res?.parentPath || parentPath,
+          children: res?.children || [],
+        })
+      );
+      dispatch(setRowLoading({ rowKey, loading: false }));
+      return { screenId, parentPath, children: res?.children || [] };
+    } catch (err) {
+      const errorMsg = err.message || 'Failed to load children';
+      dispatch(setRowError({ rowKey, error: errorMsg }));
+      return rejectWithValue({ rowKey, error: errorMsg });
+    }
+  }
+);
+
+export const searchTree = createAsyncThunk(
+  'layers/searchTree',
+  async ({ screenId, query }, { dispatch, rejectWithValue }) => {
+    if (!query || !query.trim()) {
+      dispatch(setSearchResults(null));
+      return null;
+    }
+
+    try {
+      const res = await hostProtocol.sendRpc(
+        screenId,
+        IPC_MESSAGES.QUERY_SEARCH_REQ,
+        { query: query.trim() },
+        3000
+      );
+
+      const results = res?.results || [];
+      dispatch(setSearchResults(results));
+
+      // Auto-expand all ancestor paths of matched items (R4.5)
+      const allAncestors = new Set();
+      results.forEach((item) => {
+        (item.ancestors || []).forEach((anc) => allAncestors.add(anc));
+      });
+
+      if (allAncestors.size > 0) {
+        dispatch(
+          expandAncestors({
+            screenId,
+            ancestors: Array.from(allAncestors),
+          })
+        );
+      }
+
+      return results;
+    } catch (err) {
+      return rejectWithValue(err.message || 'Search failed');
+    }
+  }
+);
 
 const layersSlice = createSlice({
   name: 'layers',
   initialState: {
     treeByScreen: {}, // { [screenId]: { [parentPath]: childNodes[] } }
-    expandedByScreen: {}, // { [screenId]: string[] (set of expanded node paths/keys) }
+    expandedByScreen: {}, // { [screenId]: string[] (paths of expanded nodes) }
     scrollPosByScreen: {}, // { [screenId]: number }
     loadingRows: {}, // { [rowKey]: boolean }
     errorRows: {}, // { [rowKey]: string }
     searchQuery: '',
-    searchResults: null, // null or array of matched items
+    searchResults: null, // null | Array<{ element, ancestors }>
+    focusedNodePath: null,
   },
   reducers: {
     setTreeNodes: (state, action) => {
@@ -71,6 +146,9 @@ const layersSlice = createSlice({
     setSearchResults: (state, action) => {
       state.searchResults = action.payload;
     },
+    setFocusedNodePath: (state, action) => {
+      state.focusedNodePath = action.payload;
+    },
     setScrollPos: (state, action) => {
       const { screenId, pos } = action.payload;
       state.scrollPosByScreen[screenId] = pos;
@@ -92,6 +170,7 @@ export const {
   setRowError,
   setSearchQuery,
   setSearchResults,
+  setFocusedNodePath,
   setScrollPos,
   resetScreenTree,
 } = layersSlice.actions;

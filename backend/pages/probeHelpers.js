@@ -103,6 +103,13 @@ export function serializeElement(el) {
   const elementChildren = Array.from(el.children).filter((c) => c.nodeType === Node.ELEMENT_NODE);
   const hasChildren = elementChildren.length > 0;
 
+  const ancestors = [];
+  let p = el.parentElement;
+  while (p && p !== document.documentElement) {
+    ancestors.unshift(p === document.body ? 'body' : getElementPath(p));
+    p = p.parentElement;
+  }
+
   return {
     id: key ? `key:${key}` : path,
     path,
@@ -113,6 +120,7 @@ export function serializeElement(el) {
     className: typeof el.className === 'string' ? el.className : '',
     text,
     hasChildren,
+    ancestors,
     rect: {
       x: Math.round(rect.x),
       y: Math.round(rect.y),
